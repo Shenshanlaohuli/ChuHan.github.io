@@ -31,7 +31,7 @@
             margin: 0;
             overflow: hidden;
             user-select: none;
-            padding-top: 15px; /* 稍微减小顶部留白 */
+            padding-top: 15px; 
         }
 
         /* 顶部面板 */
@@ -44,7 +44,7 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 5px; /* 减小下边距，让棋盘能更靠上 */
+            margin-bottom: 5px; 
             width: 95%;
             max-width: 400px;
         }
@@ -88,7 +88,7 @@
             text-align: center;
             height: 20px;
             width: 100%;
-            z-index: 5; /* 确保文字在棋盘上方 */
+            z-index: 5; 
         }
 
         /* 棋盘缩放容器 - 位置调整 */
@@ -99,8 +99,9 @@
             width: 100%;
             flex-grow: 1;
             position: relative;
-            left: -10px; 
-            margin-top: -40px; /* 关键：负边距将棋盘整体上移 */
+            /* 修改这里：往右移一点 (原为 -10px) */
+            left: 10px; 
+            margin-top: -40px; 
         }
 
         #game-container {
@@ -330,17 +331,10 @@
         function adjustBoardScale() {
             const wrapper = document.getElementById('scaler-wrapper');
             const container = document.getElementById('game-container');
-            
-            // 之前的基准是480px，为了放大，我们将基准设小
-            // 意味着同样的屏幕宽度，scale算出来会更大
-            const baseBoardWidth = 430; // 调小基准值以放大
-            
+            const baseBoardWidth = 430; 
             const screenWidth = window.innerWidth;
-            let scale = (screenWidth - 10) / baseBoardWidth; // 减少边距计算
-            
-            // 放宽最大缩放限制
+            let scale = (screenWidth - 10) / baseBoardWidth; 
             if (scale > 1.4) scale = 1.4;
-            
             container.style.transform = `rotate(30deg) scale(${scale})`;
         }
         window.addEventListener('resize', adjustBoardScale);
