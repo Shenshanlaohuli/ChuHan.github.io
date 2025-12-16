@@ -1,0 +1,654 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>楚汉争霸 - 双模式版</title>
+    <style>
+        :root {
+            --bg-color: #f0f2f5;
+            --hex-size: 52px;
+            --hex-height: 60px;
+            --chu-color: #d32f2f;
+            --han-color: #f5f5f5;
+            --border-color: #000000;
+            --highlight-color: rgba(100, 221, 23, 0.5);
+        }
+
+        body {
+            font-family: 'Microsoft YaHei', sans-serif;
+            background-color: var(--bg-color);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            overflow: hidden;
+            user-select: none;
+        }
+
+        /* 顶部面板 */
+        .header-panel {
+            z-index: 10;
+            background: white;
+            padding: 10px 30px;
+            border-radius: 0 0 20px 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            display: flex;
+            gap: 25px;
+            align-items: center;
+            margin-bottom: 30px;
+        }
+
+        .score-badge {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-weight: bold;
+            font-size: 20px;
+        }
+
+        .dot { width: 18px; height: 18px; border-radius: 50%; border: 1px solid #999; }
+        .dot-chu { background: var(--chu-color); }
+        .dot-han { background: var(--han-color); }
+
+        .status-text {
+            font-size: 18px;
+            font-weight: bold;
+            color: #555;
+            min-width: 180px;
+            text-align: center;
+        }
+
+        /* 棋盘容器 - 旋转30度 */
+        #game-container {
+            position: relative;
+            padding: 40px;
+            transform: rotate(30deg);
+            transform-origin: center center;
+            margin-left: 20px; 
+        }
+
+        .hex-row {
+            display: flex;
+            justify-content: center;
+            margin-bottom: -14px;
+        }
+
+        /* 外框 (黑色边框) */
+        .hex-border {
+            width: var(--hex-size);
+            height: var(--hex-height);
+            background-color: var(--border-color);
+            clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin: 0 1px;
+            cursor: pointer;
+            transition: transform 0.1s;
+        }
+
+        /* 内胆 */
+        .hex-inner {
+            width: calc(var(--hex-size) - 2px);
+            height: calc(var(--hex-height) - 2px);
+            background-color: #bcaaa4;
+            clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            transition: background-color 0.2s;
+        }
+
+        .hex-inner.highlight {
+            background-color: var(--highlight-color) !important;
+            box-shadow: inset 0 0 10px rgba(0,0,0,0.2);
+            cursor: pointer;
+        }
+        
+        .hex-border:hover .hex-inner.highlight {
+            background-color: rgba(100, 221, 23, 0.8) !important;
+        }
+
+        /* 内容反向旋转回正 */
+        .hex-content {
+            transform: rotate(-30deg);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            width: 100%;
+            height: 100%;
+        }
+
+        /* 编号样式 */
+        .num-label {
+            position: absolute;
+            font-size: 14px;
+            font-weight: bold;
+            color: rgba(0,0,0,0.5);
+            top: 2px;
+            pointer-events: none;
+            z-index: 1;
+        }
+
+        /* 棋子 */
+        .piece {
+            width: 34px;
+            height: 34px;
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-weight: bold;
+            font-size: 16px;
+            box-shadow: 2px 2px 4px rgba(0,0,0,0.4);
+            z-index: 2;
+        }
+
+        .piece.chu {
+            background: radial-gradient(circle at 30% 30%, #ff5252, #b71c1c);
+            color: white;
+            border: 1px solid #b71c1c;
+        }
+
+        .piece.han {
+            background: radial-gradient(circle at 30% 30%, #ffffff, #cfd8dc);
+            color: #333;
+            border: 1px solid #999;
+        }
+
+        /* 动画 */
+        .piece.pop-in {
+            animation: popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+        .piece.flipping {
+            animation: flipPiece 0.6s ease-in-out;
+        }
+
+        @keyframes popIn {
+            from { transform: scale(0); opacity: 0; }
+            to { transform: scale(1); opacity: 1; }
+        }
+
+        @keyframes flipPiece {
+            0% { transform: scaleX(1); }
+            50% { transform: scaleX(0); background: #888; color: transparent; border-color: transparent;}
+            100% { transform: scaleX(1); }
+        }
+
+        /* 弹窗系统 */
+        .modal-overlay {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.8);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 2000;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s;
+        }
+        .modal-overlay.active { opacity: 1; pointer-events: auto; }
+
+        .modal-window {
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            text-align: center;
+            width: 340px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            transform: scale(0.9);
+            transition: transform 0.3s;
+        }
+        .modal-overlay.active .modal-window { transform: scale(1); }
+
+        /* 按钮组 */
+        .btn {
+            border: none;
+            padding: 12px 10px;
+            border-radius: 6px;
+            font-size: 16px;
+            cursor: pointer;
+            width: 100%;
+            font-weight: bold;
+            margin-bottom: 10px;
+            transition: opacity 0.2s;
+        }
+        .btn:hover { opacity: 0.9; }
+
+        .btn-chu { background: var(--chu-color); color: white; }
+        .btn-han { background: #e0e0e0; color: #333; }
+        .btn-pvp { background: #2196F3; color: white; }
+        .btn-restart { background: #607d8b; color: white; }
+
+        .mode-section h3 {
+            margin: 10px 0;
+            color: #333;
+            font-size: 16px;
+        }
+        
+        .divider {
+            border: 0;
+            border-top: 1px solid #eee;
+            margin: 15px 0;
+        }
+
+    </style>
+</head>
+<body>
+
+    <div class="header-panel">
+        <div class="score-badge">
+            <div class="dot dot-chu"></div>
+            <span id="ui-chu">2</span>
+        </div>
+        <div class="status-text" id="status-text">游戏准备中...</div>
+        <div class="score-badge">
+            <div class="dot dot-han"></div>
+            <span id="ui-han">2</span>
+        </div>
+        <button onclick="showRoleSelect()" style="padding: 5px 15px; cursor: pointer; border:1px solid #ccc; border-radius:4px; background:#fff;">重开</button>
+    </div>
+
+    <div id="game-container">
+        <!-- JS生成 -->
+    </div>
+
+    <!-- 开始/选择模式弹窗 -->
+    <div id="role-select-modal" class="modal-overlay active">
+        <div class="modal-window">
+            <h2 style="margin-top:0; color:#333;">楚汉争霸</h2>
+            
+            <div class="mode-section">
+                <h3>🤖 人机对战</h3>
+                <button class="btn btn-chu" onclick="startGame('pve', 1)">我选楚军 (先手)</button>
+                <button class="btn btn-han" onclick="startGame('pve', 2)">我选汉军 (后手)</button>
+            </div>
+
+            <hr class="divider">
+
+            <div class="mode-section">
+                <h3>👥 两人对战</h3>
+                <button class="btn btn-pvp" onclick="startGame('pvp', 1)">开始两人对战</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 结算弹窗 -->
+    <div id="result-modal" class="modal-overlay">
+        <div class="modal-window">
+            <h2 id="res-title">游戏结束</h2>
+            <div style="display:flex; justify-content:space-around; font-size:24px; margin:20px 0;">
+                <div style="color:var(--chu-color)">楚: <span id="res-chu-val">0</span></div>
+                <div style="color:#666">汉: <span id="res-han-val">0</span></div>
+            </div>
+            <p id="res-msg" style="font-size:18px; font-weight:bold;"></p>
+            <button class="btn btn-restart" onclick="showRoleSelect()">再来一局</button>
+        </div>
+    </div>
+
+    <script>
+        const ROW_CONFIG = [5, 6, 7, 8, 9, 8, 7, 6, 5];
+        const TOTAL_CELLS = 61;
+        
+        let board = [];
+        let gameMode = 'pve'; // 'pve' 或 'pvp'
+        let playerSide = 1; // 仅在PVE模式下用于区分玩家
+        let currentTurn = 1; // 1:楚, 2:汉
+        let isGameOver = false;
+        let neighbors = {};
+
+        // 初始化邻接表
+        function initNeighbors() {
+            let idCounter = 1;
+            const cells = []; 
+            for(let r=0; r<ROW_CONFIG.length; r++) {
+                for(let c=0; c<ROW_CONFIG[r]; c++) {
+                    cells.push({id: idCounter++, r: r, c: c});
+                }
+            }
+
+            const getId = (r, c) => {
+                if(r<0 || r>=ROW_CONFIG.length) return null;
+                if(c<0 || c>=ROW_CONFIG[r]) return null;
+                let id = 1;
+                for(let i=0; i<r; i++) id += ROW_CONFIG[i];
+                return id + c;
+            };
+
+            for(let i=1; i<=TOTAL_CELLS; i++) {
+                neighbors[i] = [];
+                let curr = cells.find(x => x.id === i);
+                let r = curr.r, c = curr.c;
+
+                neighbors[i][0] = getId(r, c+1); // Right
+                neighbors[i][3] = getId(r, c-1); // Left
+
+                if (r > 0) { 
+                    let prevLen = ROW_CONFIG[r-1], currLen = ROW_CONFIG[r];
+                    if (prevLen < currLen) {
+                        neighbors[i][4] = getId(r-1, c-1);
+                        neighbors[i][5] = getId(r-1, c);
+                    } else {
+                        neighbors[i][4] = getId(r-1, c);
+                        neighbors[i][5] = getId(r-1, c+1);
+                    }
+                } else { neighbors[i][4] = null; neighbors[i][5] = null; }
+
+                if (r < ROW_CONFIG.length - 1) { 
+                    let nextLen = ROW_CONFIG[r+1], currLen = ROW_CONFIG[r];
+                    if (nextLen > currLen) {
+                        neighbors[i][2] = getId(r+1, c);
+                        neighbors[i][1] = getId(r+1, c+1);
+                    } else {
+                        neighbors[i][2] = getId(r+1, c-1);
+                        neighbors[i][1] = getId(r+1, c);
+                    }
+                } else { neighbors[i][2] = null; neighbors[i][1] = null; }
+            }
+        }
+
+        // --- DOM 初始化 ---
+        function createBoardDOM() {
+            const container = document.getElementById('game-container');
+            container.innerHTML = '';
+            let idCounter = 1;
+            
+            ROW_CONFIG.forEach(count => {
+                const rowDiv = document.createElement('div');
+                rowDiv.className = 'hex-row';
+                for(let j=0; j<count; j++) {
+                    const border = document.createElement('div');
+                    border.className = 'hex-border';
+                    border.dataset.id = idCounter;
+                    
+                    border.onclick = function() { handleInput(parseInt(this.dataset.id)); };
+
+                    const inner = document.createElement('div');
+                    inner.className = 'hex-inner';
+                    inner.id = `cell-${idCounter}`;
+
+                    const content = document.createElement('div');
+                    content.className = 'hex-content';
+                    content.id = `content-${idCounter}`;
+                    
+                    const num = document.createElement('span');
+                    num.className = 'num-label';
+                    num.innerText = idCounter;
+                    
+                    content.appendChild(num);
+                    inner.appendChild(content);
+                    border.appendChild(inner);
+                    rowDiv.appendChild(border);
+                    
+                    idCounter++;
+                }
+                container.appendChild(rowDiv);
+            });
+        }
+
+        // --- 核心逻辑 ---
+        function getFlips(cellId, color) {
+            if (board[cellId] !== 0) return [];
+            const opponent = color === 1 ? 2 : 1;
+            const flips = [];
+
+            for (let dir = 0; dir < 6; dir++) {
+                let path = [];
+                let nextId = neighbors[cellId][dir];
+                while (nextId !== null && board[nextId] === opponent) {
+                    path.push(nextId);
+                    nextId = neighbors[nextId][dir];
+                }
+                if (nextId !== null && board[nextId] === color && path.length > 0) {
+                    flips.push(...path);
+                }
+            }
+            return flips;
+        }
+
+        function getValidMoves(color) {
+            const moves = [];
+            for(let i=1; i<=TOTAL_CELLS; i++) {
+                if(board[i] === 0 && getFlips(i, color).length > 0) moves.push(i);
+            }
+            return moves;
+        }
+
+        // --- 游戏流程 ---
+        function showRoleSelect() {
+            document.getElementById('result-modal').classList.remove('active');
+            document.getElementById('role-select-modal').classList.add('active');
+        }
+
+        function startGame(mode, side) {
+            gameMode = mode;
+            playerSide = side; // 在PVP模式下这个变量不重要，但在PVE下决定人类是谁
+            
+            document.getElementById('role-select-modal').classList.remove('active');
+            
+            board = new Array(TOTAL_CELLS + 1).fill(0);
+            currentTurn = 1;
+            isGameOver = false;
+
+            // 初始: 楚(1):23,30 | 汉(2):22,31
+            board[23] = 1; board[30] = 1;
+            board[22] = 2; board[31] = 2;
+
+            fullRender();
+            
+            // PVE模式下，如果玩家选汉(2)，则楚(1)为AI先走
+            if (gameMode === 'pve' && playerSide === 2) {
+                setTimeout(aiMove, 600);
+            }
+        }
+
+        function handleInput(id) {
+            if (isGameOver) return;
+            
+            // 如果是PVE，必须是玩家回合
+            if (gameMode === 'pve' && currentTurn !== playerSide) return;
+
+            // PVP模式下，任何回合都可以点击（只要符合规则）
+            const flips = getFlips(id, currentTurn);
+            if (flips.length > 0) {
+                executeMove(id, currentTurn, flips);
+            }
+        }
+
+        function executeMove(id, color, flips) {
+            board[id] = color;
+            flips.forEach(fid => board[fid] = color);
+
+            updateRender(id, flips);
+
+            const counts = getCounts();
+            if (counts.empty <= 1 || counts.chu === 0 || counts.han === 0) {
+                setTimeout(() => endGame(counts), 600);
+                return;
+            }
+
+            currentTurn = currentTurn === 1 ? 2 : 1;
+            
+            let validMoves = getValidMoves(currentTurn);
+            
+            // 处理无子可下的情况（跳过回合）
+            if (validMoves.length === 0) {
+                updateStatus(true); 
+                setTimeout(() => {
+                    currentTurn = currentTurn === 1 ? 2 : 1;
+                    validMoves = getValidMoves(currentTurn);
+                    
+                    if (validMoves.length === 0) {
+                        endGame(getCounts()); // 双方都无子可下
+                    } else {
+                        updateStatus();
+                        highlightValidMoves(validMoves);
+                        // 如果跳回对方后，对方是电脑（PVE模式），则触发AI
+                        if (gameMode === 'pve' && currentTurn !== playerSide) {
+                            setTimeout(aiMove, 600);
+                        }
+                    }
+                }, 1500);
+            } else {
+                updateStatus();
+                highlightValidMoves(validMoves);
+                // 正常换手后，如果是电脑回合
+                if (gameMode === 'pve' && currentTurn !== playerSide) {
+                    setTimeout(aiMove, 600);
+                }
+            }
+        }
+
+        // --- AI 逻辑 ---
+        function aiMove() {
+            if (isGameOver) return;
+            const moves = getValidMoves(currentTurn);
+            if (moves.length === 0) return;
+
+            // 策略配置
+            const GOOD_SPOTS = [1, 5, 27, 35, 57, 61]; 
+            const BAD_SPOTS = [7, 28, 10, 34, 52, 55]; 
+
+            let bestMove = -1;
+            let maxScore = -Infinity;
+
+            moves.sort(() => Math.random() - 0.5);
+
+            for (let m of moves) {
+                let score = getFlips(m, currentTurn).length;
+                if (GOOD_SPOTS.includes(m)) {
+                    score += 100; 
+                } else if (BAD_SPOTS.includes(m)) {
+                    score -= 50;  
+                } else {
+                    if (neighbors[m].includes(null)) {
+                        score += 5; 
+                    }
+                }
+
+                if (score > maxScore) {
+                    maxScore = score;
+                    bestMove = m;
+                }
+            }
+            
+            const flips = getFlips(bestMove, currentTurn);
+            executeMove(bestMove, currentTurn, flips);
+        }
+
+        function getCounts() {
+            let chu = 0, han = 0, empty = 0;
+            for(let i=1; i<=TOTAL_CELLS; i++) {
+                if(board[i]===1) chu++;
+                else if(board[i]===2) han++;
+                else empty++;
+            }
+            return {chu, han, empty};
+        }
+
+        function endGame(counts) {
+            isGameOver = true;
+            document.querySelectorAll('.hex-inner').forEach(el => el.classList.remove('highlight'));
+            document.getElementById('status-text').innerText = "游戏结束";
+            
+            document.getElementById('res-chu-val').innerText = counts.chu;
+            document.getElementById('res-han-val').innerText = counts.han;
+            
+            const msg = document.getElementById('res-msg');
+            
+            if(counts.chu > counts.han) {
+                msg.innerText = "楚霸王（红）一统天下！";
+                msg.style.color = "var(--chu-color)";
+            } else if(counts.han > counts.chu) {
+                msg.innerText = "大汉（白）建立伟业！";
+                msg.style.color = "#555";
+            } else {
+                msg.innerText = "双方战平，汉军（后手）判胜！";
+                msg.style.color = "#555";
+            }
+            
+            document.getElementById('result-modal').classList.add('active');
+        }
+
+        // --- 渲染 ---
+        function fullRender() {
+            document.querySelectorAll('.hex-inner').forEach(el => el.classList.remove('highlight'));
+            document.querySelectorAll('.hex-content .piece').forEach(el => el.remove());
+
+            for(let i=1; i<=TOTAL_CELLS; i++) {
+                if(board[i] !== 0) {
+                    addPieceToDOM(i, board[i], false);
+                }
+            }
+            updateStatus();
+            
+            // 在PVP模式下，或者PVE轮到玩家时，显示高亮
+            if (!isGameOver) {
+                if (gameMode === 'pvp' || (gameMode === 'pve' && currentTurn === playerSide)) {
+                    highlightValidMoves(getValidMoves(currentTurn));
+                }
+            }
+        }
+
+        function updateRender(newId, flippedIds) {
+            addPieceToDOM(newId, board[newId], true, 'pop-in');
+            flippedIds.forEach(id => {
+                const content = document.getElementById(`content-${id}`);
+                const oldPiece = content.querySelector('.piece');
+                if(oldPiece) oldPiece.remove();
+                addPieceToDOM(id, board[id], true, 'flipping'); 
+            });
+            const c = getCounts();
+            document.getElementById('ui-chu').innerText = c.chu;
+            document.getElementById('ui-han').innerText = c.han;
+        }
+
+        function addPieceToDOM(id, type, animate, animClass) {
+            const container = document.getElementById(`content-${id}`);
+            const p = document.createElement('div');
+            p.className = `piece ${type === 1 ? 'chu' : 'han'}`;
+            p.innerText = type === 1 ? '楚' : '汉';
+            if(animate && animClass) {
+                p.classList.add(animClass);
+            }
+            container.appendChild(p);
+        }
+
+        function highlightValidMoves(moves) {
+            document.querySelectorAll('.hex-inner').forEach(el => el.classList.remove('highlight'));
+            moves.forEach(id => {
+                const cell = document.getElementById(`cell-${id}`);
+                if(cell) cell.classList.add('highlight');
+            });
+        }
+
+        function updateStatus(skip=false) {
+            const el = document.getElementById('status-text');
+            const c = getCounts();
+            document.getElementById('ui-chu').innerText = c.chu;
+            document.getElementById('ui-han').innerText = c.han;
+
+            if(skip) {
+                el.innerText = "无处落子 - 跳过";
+                el.style.color = "orange";
+                return;
+            }
+            if(currentTurn === 1) {
+                el.innerText = "楚军（红）回合";
+                el.style.color = "var(--chu-color)";
+            } else {
+                el.innerText = "汉军（白）回合";
+                el.style.color = "#555";
+            }
+        }
+
+        // 启动
+        initNeighbors();
+        createBoardDOM();
+
+    </script>
+</body>
+</html>
