@@ -2,77 +2,105 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>楚汉争霸 - 双模式版</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>楚汉争霸 - 移动版</title>
     <style>
         :root {
             --bg-color: #f0f2f5;
-            --hex-size: 52px;
-            --hex-height: 60px;
+            --hex-size: 50px; /* 稍微调小一点基础尺寸 */
+            --hex-height: 58px;
             --chu-color: #d32f2f;
             --han-color: #f5f5f5;
             --border-color: #000000;
             --highlight-color: rgba(100, 221, 23, 0.5);
         }
 
+        * {
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent; /* 移除点击高亮 */
+        }
+
         body {
-            font-family: 'Microsoft YaHei', sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Microsoft YaHei', sans-serif;
             background-color: var(--bg-color);
             display: flex;
             flex-direction: column;
             align-items: center;
+            justify-content: flex-start; /* 改为从上往下，靠padding调整位置 */
             min-height: 100vh;
             margin: 0;
             overflow: hidden;
             user-select: none;
+            padding-top: 20px;
         }
 
-        /* 顶部面板 */
+        /* 顶部面板 - 移动端适配 */
         .header-panel {
             z-index: 10;
             background: white;
-            padding: 10px 30px;
-            border-radius: 0 0 20px 20px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            padding: 10px 15px;
+            border-radius: 30px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
             display: flex;
-            gap: 25px;
+            justify-content: space-between;
             align-items: center;
-            margin-bottom: 30px;
+            margin-bottom: 20px;
+            width: 90%;
+            max-width: 400px;
+        }
+
+        .score-group {
+            display: flex;
+            align-items: center;
+            gap: 15px;
         }
 
         .score-badge {
             display: flex;
             align-items: center;
-            gap: 8px;
+            gap: 6px;
             font-weight: bold;
-            font-size: 20px;
+            font-size: 18px;
         }
 
-        .dot { width: 18px; height: 18px; border-radius: 50%; border: 1px solid #999; }
+        .dot { width: 16px; height: 16px; border-radius: 50%; border: 1px solid #999; }
         .dot-chu { background: var(--chu-color); }
         .dot-han { background: var(--han-color); }
 
-        .status-text {
-            font-size: 18px;
+        .status-bar {
+            margin-top: 10px;
+            font-size: 16px;
             font-weight: bold;
             color: #555;
-            min-width: 180px;
             text-align: center;
+            height: 24px;
+            width: 100%;
+        }
+
+        /* 棋盘缩放容器 */
+        #scaler-wrapper {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            width: 100%;
+            flex-grow: 1; /* 占据剩余空间 */
+            position: relative;
+            /* 修正视觉中心偏移 */
+            left: -10px; 
         }
 
         /* 棋盘容器 - 旋转30度 */
         #game-container {
             position: relative;
-            padding: 40px;
+            padding: 20px;
             transform: rotate(30deg);
             transform-origin: center center;
-            margin-left: 20px; 
         }
 
         .hex-row {
             display: flex;
             justify-content: center;
-            margin-bottom: -14px;
+            margin-bottom: -13px; /* 紧凑一点 */
         }
 
         /* 外框 (黑色边框) */
@@ -86,7 +114,6 @@
             align-items: center;
             margin: 0 1px;
             cursor: pointer;
-            transition: transform 0.1s;
         }
 
         /* 内胆 */
@@ -103,14 +130,8 @@
 
         .hex-inner.highlight {
             background-color: var(--highlight-color) !important;
-            box-shadow: inset 0 0 10px rgba(0,0,0,0.2);
-            cursor: pointer;
         }
         
-        .hex-border:hover .hex-inner.highlight {
-            background-color: rgba(100, 221, 23, 0.8) !important;
-        }
-
         /* 内容反向旋转回正 */
         .hex-content {
             transform: rotate(-30deg);
@@ -121,12 +142,12 @@
             height: 100%;
         }
 
-        /* 编号样式 */
+        /* 编号样式 - 增大字体 */
         .num-label {
             position: absolute;
-            font-size: 14px;
-            font-weight: bold;
-            color: rgba(0,0,0,0.5);
+            font-size: 16px;
+            font-weight: 800;
+            color: rgba(0,0,0,0.4);
             top: 2px;
             pointer-events: none;
             z-index: 1;
@@ -159,12 +180,8 @@
         }
 
         /* 动画 */
-        .piece.pop-in {
-            animation: popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-        }
-        .piece.flipping {
-            animation: flipPiece 0.6s ease-in-out;
-        }
+        .piece.pop-in { animation: popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+        .piece.flipping { animation: flipPiece 0.6s ease-in-out; }
 
         @keyframes popIn {
             from { transform: scale(0); opacity: 0; }
@@ -177,11 +194,11 @@
             100% { transform: scaleX(1); }
         }
 
-        /* 弹窗系统 */
+        /* 弹窗系统 - 居中优化 */
         .modal-overlay {
             position: fixed;
             top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.8);
+            background: rgba(0,0,0,0.85); /* 深一点背景 */
             display: flex;
             justify-content: center;
             align-items: center;
@@ -189,103 +206,127 @@
             opacity: 0;
             pointer-events: none;
             transition: opacity 0.3s;
+            padding: 20px;
         }
         .modal-overlay.active { opacity: 1; pointer-events: auto; }
 
         .modal-window {
             background: white;
-            padding: 30px;
-            border-radius: 12px;
+            padding: 25px;
+            border-radius: 16px;
             text-align: center;
-            width: 340px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
-            transform: scale(0.9);
+            width: 100%;
+            max-width: 320px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.6);
+            transform: scale(0.95);
             transition: transform 0.3s;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
         }
         .modal-overlay.active .modal-window { transform: scale(1); }
 
-        /* 按钮组 */
+        /* 按钮组 - 增大点击区域 */
         .btn {
             border: none;
-            padding: 12px 10px;
-            border-radius: 6px;
-            font-size: 16px;
+            padding: 15px 0;
+            border-radius: 12px;
+            font-size: 18px;
             cursor: pointer;
             width: 100%;
             font-weight: bold;
-            margin-bottom: 10px;
-            transition: opacity 0.2s;
+            margin-bottom: 12px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
         }
-        .btn:hover { opacity: 0.9; }
+        .btn:active { transform: scale(0.98); }
 
         .btn-chu { background: var(--chu-color); color: white; }
         .btn-han { background: #e0e0e0; color: #333; }
         .btn-pvp { background: #2196F3; color: white; }
-        .btn-restart { background: #607d8b; color: white; }
+        .btn-restart { background: #607d8b; color: white; font-size: 14px; padding: 6px 15px; border-radius: 4px; box-shadow: none; margin:0;}
+        .btn-again { background: #4CAF50; color: white; margin-top: 10px;}
 
+        h2 { margin-top: 0; margin-bottom: 15px; font-size: 24px; color: #333; }
+        
         .mode-section h3 {
-            margin: 10px 0;
-            color: #333;
+            margin: 0 0 15px 0;
+            color: #555;
             font-size: 16px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
         }
         
         .divider {
             border: 0;
             border-top: 1px solid #eee;
-            margin: 15px 0;
+            margin: 20px 0;
         }
 
     </style>
 </head>
 <body>
 
-    <div class="header-panel">
-        <div class="score-badge">
-            <div class="dot dot-chu"></div>
-            <span id="ui-chu">2</span>
+    <!-- 顶部信息栏 -->
+    <div style="width:100%; display:flex; flex-direction:column; align-items:center;">
+        <div class="header-panel">
+            <div class="score-badge">
+                <div class="dot dot-chu"></div>
+                <span id="ui-chu">2</span>
+            </div>
+            
+            <button class="btn btn-restart" onclick="showRoleSelect()">菜单 / 重开</button>
+            
+            <div class="score-badge">
+                <span id="ui-han">2</span>
+                <div class="dot dot-han"></div>
+            </div>
         </div>
-        <div class="status-text" id="status-text">游戏准备中...</div>
-        <div class="score-badge">
-            <div class="dot dot-han"></div>
-            <span id="ui-han">2</span>
-        </div>
-        <button onclick="showRoleSelect()" style="padding: 5px 15px; cursor: pointer; border:1px solid #ccc; border-radius:4px; background:#fff;">重开</button>
+        <div id="status-text" class="status-bar">游戏准备中...</div>
     </div>
 
-    <div id="game-container">
-        <!-- JS生成 -->
+    <!-- 棋盘缩放包裹层 -->
+    <div id="scaler-wrapper">
+        <div id="game-container">
+            <!-- JS生成 -->
+        </div>
     </div>
 
-    <!-- 开始/选择模式弹窗 -->
+    <!-- 开始/选择模式弹窗 (居中对齐) -->
     <div id="role-select-modal" class="modal-overlay active">
         <div class="modal-window">
-            <h2 style="margin-top:0; color:#333;">楚汉争霸</h2>
+            <h2>楚汉争霸</h2>
             
             <div class="mode-section">
-                <h3>🤖 人机对战</h3>
-                <button class="btn btn-chu" onclick="startGame('pve', 1)">我选楚军 (先手)</button>
-                <button class="btn btn-han" onclick="startGame('pve', 2)">我选汉军 (后手)</button>
+                <h3>🤖 单人挑战 (人机)</h3>
+                <button class="btn btn-chu" onclick="startGame('pve', 1)">楚军 (红) - 先手</button>
+                <button class="btn btn-han" onclick="startGame('pve', 2)">汉军 (白) - 后手</button>
             </div>
 
             <hr class="divider">
 
             <div class="mode-section">
-                <h3>👥 两人对战</h3>
+                <h3>👥 面对面 (双人)</h3>
                 <button class="btn btn-pvp" onclick="startGame('pvp', 1)">开始两人对战</button>
             </div>
         </div>
     </div>
 
-    <!-- 结算弹窗 -->
+    <!-- 结算弹窗 (居中对齐) -->
     <div id="result-modal" class="modal-overlay">
         <div class="modal-window">
-            <h2 id="res-title">游戏结束</h2>
-            <div style="display:flex; justify-content:space-around; font-size:24px; margin:20px 0;">
-                <div style="color:var(--chu-color)">楚: <span id="res-chu-val">0</span></div>
-                <div style="color:#666">汉: <span id="res-han-val">0</span></div>
+            <h2 id="res-title">战局结束</h2>
+            <div style="display:flex; justify-content:space-around; font-size:32px; margin:20px 0; font-weight:800;">
+                <div style="color:var(--chu-color)">
+                    <span style="font-size:14px; display:block;">楚</span>
+                    <span id="res-chu-val">0</span>
+                </div>
+                <div style="color:#555">
+                    <span style="font-size:14px; display:block;">汉</span>
+                    <span id="res-han-val">0</span>
+                </div>
             </div>
-            <p id="res-msg" style="font-size:18px; font-weight:bold;"></p>
-            <button class="btn btn-restart" onclick="showRoleSelect()">再来一局</button>
+            <p id="res-msg" style="font-size:18px; font-weight:bold; margin-bottom:20px; line-height:1.5;"></p>
+            <button class="btn btn-again" onclick="showRoleSelect()">返回主菜单</button>
         </div>
     </div>
 
@@ -294,13 +335,39 @@
         const TOTAL_CELLS = 61;
         
         let board = [];
-        let gameMode = 'pve'; // 'pve' 或 'pvp'
-        let playerSide = 1; // 仅在PVE模式下用于区分玩家
-        let currentTurn = 1; // 1:楚, 2:汉
+        let gameMode = 'pve'; 
+        let playerSide = 1; 
+        let currentTurn = 1; 
         let isGameOver = false;
         let neighbors = {};
 
-        // 初始化邻接表
+        // --- 屏幕适配逻辑 ---
+        function adjustBoardScale() {
+            const wrapper = document.getElementById('scaler-wrapper');
+            const container = document.getElementById('game-container');
+            
+            // 棋盘的大致原始宽度（基于css计算）
+            // 9列 * ~52px + 间隙 + 旋转导致的对角线投影
+            // 简单估算：未旋转宽度约 480px，旋转后看起来更宽
+            const baseBoardWidth = 480; 
+            
+            const screenWidth = window.innerWidth;
+            const screenHeight = window.innerHeight;
+            
+            // 计算缩放比例，留出左右边距
+            let scale = (screenWidth - 20) / baseBoardWidth;
+            
+            // 限制最大缩放，防止在大屏上过大
+            if (scale > 1.2) scale = 1.2;
+            
+            container.style.transform = `rotate(30deg) scale(${scale})`;
+        }
+
+        // 监听窗口大小变化
+        window.addEventListener('resize', adjustBoardScale);
+        window.addEventListener('load', adjustBoardScale);
+
+        // --- 初始化邻接表 ---
         function initNeighbors() {
             let idCounter = 1;
             const cells = []; 
@@ -323,8 +390,8 @@
                 let curr = cells.find(x => x.id === i);
                 let r = curr.r, c = curr.c;
 
-                neighbors[i][0] = getId(r, c+1); // Right
-                neighbors[i][3] = getId(r, c-1); // Left
+                neighbors[i][0] = getId(r, c+1); 
+                neighbors[i][3] = getId(r, c-1); 
 
                 if (r > 0) { 
                     let prevLen = ROW_CONFIG[r-1], currLen = ROW_CONFIG[r];
@@ -364,6 +431,7 @@
                     border.className = 'hex-border';
                     border.dataset.id = idCounter;
                     
+                    // 兼容移动端触摸事件
                     border.onclick = function() { handleInput(parseInt(this.dataset.id)); };
 
                     const inner = document.createElement('div');
@@ -387,6 +455,8 @@
                 }
                 container.appendChild(rowDiv);
             });
+            // 立即调用缩放
+            adjustBoardScale();
         }
 
         // --- 核心逻辑 ---
@@ -425,7 +495,7 @@
 
         function startGame(mode, side) {
             gameMode = mode;
-            playerSide = side; // 在PVP模式下这个变量不重要，但在PVE下决定人类是谁
+            playerSide = side; 
             
             document.getElementById('role-select-modal').classList.remove('active');
             
@@ -433,13 +503,12 @@
             currentTurn = 1;
             isGameOver = false;
 
-            // 初始: 楚(1):23,30 | 汉(2):22,31
+            // 初始布局
             board[23] = 1; board[30] = 1;
             board[22] = 2; board[31] = 2;
 
             fullRender();
             
-            // PVE模式下，如果玩家选汉(2)，则楚(1)为AI先走
             if (gameMode === 'pve' && playerSide === 2) {
                 setTimeout(aiMove, 600);
             }
@@ -447,11 +516,8 @@
 
         function handleInput(id) {
             if (isGameOver) return;
-            
-            // 如果是PVE，必须是玩家回合
             if (gameMode === 'pve' && currentTurn !== playerSide) return;
 
-            // PVP模式下，任何回合都可以点击（只要符合规则）
             const flips = getFlips(id, currentTurn);
             if (flips.length > 0) {
                 executeMove(id, currentTurn, flips);
@@ -474,7 +540,6 @@
             
             let validMoves = getValidMoves(currentTurn);
             
-            // 处理无子可下的情况（跳过回合）
             if (validMoves.length === 0) {
                 updateStatus(true); 
                 setTimeout(() => {
@@ -482,11 +547,10 @@
                     validMoves = getValidMoves(currentTurn);
                     
                     if (validMoves.length === 0) {
-                        endGame(getCounts()); // 双方都无子可下
+                        endGame(getCounts()); 
                     } else {
                         updateStatus();
                         highlightValidMoves(validMoves);
-                        // 如果跳回对方后，对方是电脑（PVE模式），则触发AI
                         if (gameMode === 'pve' && currentTurn !== playerSide) {
                             setTimeout(aiMove, 600);
                         }
@@ -495,7 +559,6 @@
             } else {
                 updateStatus();
                 highlightValidMoves(validMoves);
-                // 正常换手后，如果是电脑回合
                 if (gameMode === 'pve' && currentTurn !== playerSide) {
                     setTimeout(aiMove, 600);
                 }
@@ -508,7 +571,6 @@
             const moves = getValidMoves(currentTurn);
             if (moves.length === 0) return;
 
-            // 策略配置
             const GOOD_SPOTS = [1, 5, 27, 35, 57, 61]; 
             const BAD_SPOTS = [7, 28, 10, 34, 52, 55]; 
 
@@ -585,7 +647,6 @@
             }
             updateStatus();
             
-            // 在PVP模式下，或者PVE轮到玩家时，显示高亮
             if (!isGameOver) {
                 if (gameMode === 'pvp' || (gameMode === 'pve' && currentTurn === playerSide)) {
                     highlightValidMoves(getValidMoves(currentTurn));
